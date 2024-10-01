@@ -1,1 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: infrastructure-deployment
+  namespace: argo
+spec:
+  entrypoint: deploy-infrastructure
+  arguments:
+    parameters:
+      - name: terraform-folder-path
+        value: "./"
+      - name: terraform-vars-file-path
+        value: "overlays/dev/main.tfvars"  # Default value, overridden by patch
+      - name: terraform-state-key
+        value: "terraform.tfstate"
+
+  templates:
+    - name: deploy-infrastructure
+      steps:
+        - - name: terraform-init
+            template: terraform-init
+        - - name: terraform-apply
+            template: terraform-apply
+
+    - name: terraform-init
+      inputs:
+        parameters:
+          - name: terraform-folder-path
+      container:
+        image: hashicorp/terraform:1.0.11
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            cd {{inputs.parameters.terraform-folder-path}}
+            terraform init -backend-config=terraform.tfstate
+
+    - name: terraform-apply
+      inputs:
+        parameters:
+          - name: terraform-folder-path
+          - name: terraform-vars-file-path
+          - name: terraform-state-key
+      container:
+        image: hashicorp/terraform:1.0.11
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            cd {{inputs.parameters.terraform-folder-path}}
+            terraform apply -var-file={{inputs.parameters.terraform-vars-file-path}} -auto-approve
 
